@@ -16,9 +16,17 @@ import {
   Twitter,
   Zap
 } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useScroll,
+  useSpring
+} from "framer-motion";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { MouseEvent } from "react";
 
 type Project = {
   title: string;
@@ -161,12 +169,14 @@ const heroBadge = {
 };
 
 const heroTitle = {
-  hidden: { opacity: 0, y: 30 },
-  show: {
+  hidden: { opacity: 0, y: 40, filter: "blur(10px)", letterSpacing: "0.03em" },
+  show: (delay: number) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.72, ease: "easeOut" }
-  }
+    filter: "blur(0px)",
+    letterSpacing: "0em",
+    transition: { duration: 0.8, ease: "easeOut", delay }
+  })
 };
 
 const heroSubtitle = {
@@ -223,9 +233,28 @@ const codeLineVariant = {
 
 export default function Home() {
   const year = new Date().getFullYear();
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandOpen((isOpen) => !isOpen);
+      }
+
+      if (event.key === "Escape") {
+        setIsCommandOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-ink text-slate-50">
+      <ScrollProgress />
+      <MouseGlow />
       <div className="surface-grid pointer-events-none absolute inset-0 opacity-80" />
       <Navbar />
       <Hero />
@@ -235,9 +264,187 @@ export default function Home() {
       <Highlights />
       <Contact />
       <footer className="border-t border-line px-5 py-8 text-center text-sm text-slate-500">
-        Built by Emre Miraç Çakır · {year}
+        Built by Emre Miraç Çakır · {year} · Press ⌘K
       </footer>
+      <CommandPalette
+        isOpen={isCommandOpen}
+        onClose={() => setIsCommandOpen(false)}
+      />
     </main>
+  );
+}
+
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 24,
+    restDelta: 0.001
+  });
+
+  return (
+    <motion.div
+      className="fixed inset-x-0 top-0 z-[70] h-0.5 origin-left bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-600"
+      style={{ scaleX }}
+    />
+  );
+}
+
+function MouseGlow() {
+  const [enabled, setEnabled] = useState(false);
+  const x = useMotionValue(-400);
+  const y = useMotionValue(-400);
+  const smoothX = useSpring(x, { stiffness: 80, damping: 28, mass: 0.5 });
+  const smoothY = useSpring(y, { stiffness: 80, damping: 28, mass: 0.5 });
+
+  useEffect(() => {
+    const canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    setEnabled(canHover);
+
+    if (!canHover) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      x.set(event.clientX - 190);
+      y.set(event.clientY - 190);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    return () => window.removeEventListener("pointermove", handlePointerMove);
+  }, [x, y]);
+
+  if (!enabled) {
+    return null;
+  }
+
+  return (
+    <motion.div
+      className="pointer-events-none fixed z-30 hidden h-[24rem] w-[24rem] rounded-full bg-[radial-gradient(circle,rgba(33,212,253,0.16)_0%,rgba(37,99,235,0.06)_38%,transparent_68%)] blur-xl md:block"
+      style={{ x: smoothX, y: smoothY }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function CommandPalette({
+  isOpen,
+  onClose
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const actions = [
+    { label: "About", detail: "Learn more about Emre", href: "#about", icon: Cpu },
+    { label: "Projects", detail: "View selected builds", href: "#projects", icon: Rocket },
+    { label: "Writing", detail: "Read technology articles", href: "#writing", icon: BookOpenText },
+    { label: "Contact", detail: "Open contact section", href: "#contact", icon: Mail },
+    {
+      label: "GitHub",
+      detail: "github.com/emremiracc",
+      href: "https://github.com/emremiracc",
+      icon: Github,
+      external: true
+    },
+    {
+      label: "LinkedIn",
+      detail: "linkedin.com/in/emremiracckrr",
+      href: "https://www.linkedin.com/in/emremiracckrr/",
+      icon: Linkedin,
+      external: true
+    },
+    {
+      label: "Email",
+      detail: "emremiracckr@gmail.com",
+      href: "mailto:emremiracckr@gmail.com",
+      icon: Mail
+    },
+    {
+      label: "X / Twitter",
+      detail: "x.com/emremiracckr",
+      href: "https://x.com/emremiracckr",
+      icon: Twitter,
+      external: true
+    }
+  ];
+
+  const runAction = (href: string, external?: boolean) => {
+    onClose();
+
+    if (href.startsWith("#")) {
+      document.querySelector(href)?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    if (external) {
+      window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    window.location.href = href;
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          className="fixed inset-0 z-[80] grid place-items-center bg-black/55 px-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onMouseDown={onClose}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
+            className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#080d16]/95 shadow-[0_28px_120px_rgba(0,0,0,0.55),0_0_80px_rgba(33,212,253,0.12)]"
+            initial={{ opacity: 0, y: 18, scale: 0.97, filter: "blur(8px)" }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: 12, scale: 0.98, filter: "blur(8px)" }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-white/10 px-5 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-semibold text-white">Quick actions</p>
+                <kbd className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-400">
+                  Esc
+                </kbd>
+              </div>
+            </div>
+            <div className="grid gap-1 p-2">
+              {actions.map((action, index) => (
+                <motion.button
+                  key={action.label}
+                  type="button"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.22, delay: index * 0.025, ease: "easeOut" }}
+                  onClick={() => runAction(action.href, action.external)}
+                  className="group flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition hover:bg-cyan-300/10"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-lg border border-cyan-200/15 bg-cyan-300/10 text-cyan-100 transition group-hover:border-cyan-200/40">
+                      <action.icon className="h-5 w-5" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-medium text-white">
+                        {action.label}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {action.detail}
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-slate-600 transition group-hover:translate-x-1 group-hover:text-cyan-100" />
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -375,12 +582,22 @@ function Hero() {
             <Sparkles className="h-4 w-4" />
             Software Developer · Technology Columnist · Builder
           </motion.div>
-          <motion.h1
-            variants={heroTitle}
-            className="text-balance text-5xl font-semibold leading-[0.98] tracking-normal text-white sm:text-7xl lg:text-8xl"
-          >
-            Emre Miraç Çakır
-          </motion.h1>
+          <h1 className="text-balance text-5xl font-semibold leading-[0.98] text-white sm:text-7xl lg:text-8xl">
+            <motion.span
+              custom={0.2}
+              variants={heroTitle}
+              className="block will-change-transform"
+            >
+              Emre Miraç
+            </motion.span>
+            <motion.span
+              custom={0.4}
+              variants={heroTitle}
+              className="block will-change-transform"
+            >
+              Çakır
+            </motion.span>
+          </h1>
           <motion.p
             variants={heroSubtitle}
             className="mt-7 max-w-2xl text-balance text-xl leading-8 text-slate-300 sm:text-2xl sm:leading-9"
@@ -548,37 +765,75 @@ function Projects() {
         className="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
       >
         {projects.map((project) => (
-          <motion.article
-            key={project.title}
-            variants={scrollItem}
-            whileHover={{ y: -6 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="group"
-          >
-            <GlassPanel className="flex h-full flex-col group-hover:border-cyan-300/40 group-hover:shadow-[0_24px_80px_rgba(33,212,253,0.14)]">
-              <h3 className="text-xl font-semibold text-white">{project.title}</h3>
-              <p className="mt-4 flex-1 leading-7 text-slate-300">
-                {project.description}
-              </p>
-              <div className="mt-6 flex flex-wrap gap-2">
-                {project.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-7 flex gap-3">
-                <SmallButton href="#">View Details</SmallButton>
-                <SmallButton href="#">GitHub</SmallButton>
-              </div>
-            </GlassPanel>
-          </motion.article>
+          <TiltProjectCard key={project.title} project={project} />
         ))}
       </motion.div>
     </Section>
+  );
+}
+
+function TiltProjectCard({ project }: { project: Project }) {
+  const rotateX = useMotionValue(0);
+  const rotateY = useMotionValue(0);
+  const smoothRotateX = useSpring(rotateX, { stiffness: 180, damping: 18 });
+  const smoothRotateY = useSpring(rotateY, { stiffness: 180, damping: 18 });
+
+  const handleMouseMove = (event: MouseEvent<HTMLElement>) => {
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    rotateX.set(((centerY - y) / centerY) * 4);
+    rotateY.set(((x - centerX) / centerX) * 5);
+  };
+
+  const handleMouseLeave = () => {
+    rotateX.set(0);
+    rotateY.set(0);
+  };
+
+  return (
+    <motion.article
+      variants={scrollItem}
+      whileHover={{ y: -6 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        rotateX: smoothRotateX,
+        rotateY: smoothRotateY,
+        transformPerspective: 900,
+        transformStyle: "preserve-3d"
+      }}
+      className="group"
+    >
+      <GlassPanel className="flex h-full flex-col group-hover:border-cyan-300/40 group-hover:shadow-[0_24px_80px_rgba(33,212,253,0.14)]">
+        <h3 className="text-xl font-semibold text-white">{project.title}</h3>
+        <p className="mt-4 flex-1 leading-7 text-slate-300">
+          {project.description}
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {project.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+        <div className="mt-7 flex gap-3">
+          <SmallButton href="#">View Details</SmallButton>
+          <SmallButton href="#">GitHub</SmallButton>
+        </div>
+      </GlassPanel>
+    </motion.article>
   );
 }
 

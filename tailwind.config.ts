@@ -19,7 +19,14 @@ const config: Config = {
         card: "0 24px 80px rgba(0, 0, 0, 0.32)"
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"]
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        heading: [
+          "var(--font-inter-tight)",
+          "var(--font-inter)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif"
+        ]
       }
     }
   },

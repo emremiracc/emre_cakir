@@ -23,6 +23,7 @@ import {
   useScroll,
   useSpring
 } from "framer-motion";
+import Lenis from "lenis";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -53,6 +54,8 @@ const navItems = [
   { label: "Writing", href: "#writing" },
   { label: "Contact", href: "#contact" }
 ];
+
+const trackedSectionIds = navItems.map((item) => item.href.replace("#", ""));
 
 const projects: Project[] = [
   {
@@ -231,6 +234,24 @@ const codeLineVariant = {
   }
 };
 
+const socialLinks = [
+  {
+    label: "GitHub",
+    href: "https://github.com/emremiracc",
+    icon: Github
+  },
+  {
+    label: "LinkedIn",
+    href: "https://www.linkedin.com/in/emremiracckrr/",
+    icon: Linkedin
+  },
+  {
+    label: "X / Twitter",
+    href: "https://x.com/emremiracckr",
+    icon: Twitter
+  }
+];
+
 export default function Home() {
   const year = new Date().getFullYear();
   const [isCommandOpen, setIsCommandOpen] = useState(false);
@@ -253,9 +274,11 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-ink text-slate-50">
+      <SmoothScroll />
+      <LoadingIntro />
       <ScrollProgress />
       <MouseGlow />
-      <div className="surface-grid pointer-events-none absolute inset-0 opacity-80" />
+      <div className="surface-grid pointer-events-none absolute inset-0 z-0 opacity-80" />
       <Navbar />
       <Hero />
       <About />
@@ -263,14 +286,78 @@ export default function Home() {
       <Writing />
       <Highlights />
       <Contact />
-      <footer className="border-t border-line px-5 py-8 text-center text-sm text-slate-500">
-        Built by Emre Miraç Çakır · {year} · Press ⌘K
-      </footer>
+      <Footer year={year} />
       <CommandPalette
         isOpen={isCommandOpen}
         onClose={() => setIsCommandOpen(false)}
       />
     </main>
+  );
+}
+
+function SmoothScroll() {
+  useEffect(() => {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+    if (reduceMotion || !finePointer) {
+      return;
+    }
+
+    const lenis = new Lenis({
+      duration: 0.85,
+      easing: (time) => 1 - Math.pow(1 - time, 3),
+      smoothWheel: true,
+      wheelMultiplier: 0.9,
+      touchMultiplier: 1
+    });
+
+    let rafId = 0;
+    const raf = (time: number) => {
+      lenis.raf(time);
+      rafId = requestAnimationFrame(raf);
+    };
+
+    rafId = requestAnimationFrame(raf);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      lenis.destroy();
+    };
+  }, []);
+
+  return null;
+}
+
+function LoadingIntro() {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setVisible(false), 700);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  return (
+    <AnimatePresence>
+      {visible ? (
+        <motion.div
+          className="fixed inset-0 z-[100] grid place-items-center bg-ink"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.24, ease: "easeOut" }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, filter: "blur(8px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.04, filter: "blur(8px)" }}
+            transition={{ duration: 0.42, ease: "easeOut" }}
+            className="scale-125"
+          >
+            <Logo />
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -294,8 +381,8 @@ function MouseGlow() {
   const [enabled, setEnabled] = useState(false);
   const x = useMotionValue(-400);
   const y = useMotionValue(-400);
-  const smoothX = useSpring(x, { stiffness: 80, damping: 28, mass: 0.5 });
-  const smoothY = useSpring(y, { stiffness: 80, damping: 28, mass: 0.5 });
+  const smoothX = useSpring(x, { stiffness: 220, damping: 34, mass: 0.35 });
+  const smoothY = useSpring(y, { stiffness: 220, damping: 34, mass: 0.35 });
 
   useEffect(() => {
     const canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -306,8 +393,8 @@ function MouseGlow() {
     }
 
     const handlePointerMove = (event: PointerEvent) => {
-      x.set(event.clientX - 190);
-      y.set(event.clientY - 190);
+      x.set(event.clientX - 150);
+      y.set(event.clientY - 150);
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -320,11 +407,44 @@ function MouseGlow() {
 
   return (
     <motion.div
-      className="pointer-events-none fixed z-30 hidden h-[24rem] w-[24rem] rounded-full bg-[radial-gradient(circle,rgba(33,212,253,0.16)_0%,rgba(37,99,235,0.06)_38%,transparent_68%)] blur-xl md:block"
+      className="pointer-events-none fixed z-10 hidden h-[19rem] w-[19rem] rounded-full bg-[radial-gradient(circle,rgba(33,212,253,0.09)_0%,rgba(37,99,235,0.035)_42%,transparent_70%)] blur-2xl md:block"
       style={{ x: smoothX, y: smoothY }}
       aria-hidden="true"
     />
   );
+}
+
+function useActiveSection(sectionIds: string[]) {
+  const [activeSection, setActiveSection] = useState("");
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+        if (visible?.target.id) {
+          setActiveSection(visible.target.id);
+        }
+      },
+      {
+        rootMargin: "-35% 0px -55% 0px",
+        threshold: [0.12, 0.25, 0.5]
+      }
+    );
+
+    sectionIds.forEach((id) => {
+      const section = document.getElementById(id);
+      if (section) {
+        observer.observe(section);
+      }
+    });
+
+    return () => observer.disconnect();
+  }, [sectionIds]);
+
+  return activeSection;
 }
 
 function CommandPalette({
@@ -358,13 +478,6 @@ function CommandPalette({
       detail: "emremiracckr@gmail.com",
       href: "mailto:emremiracckr@gmail.com",
       icon: Mail
-    },
-    {
-      label: "X / Twitter",
-      detail: "x.com/emremiracckr",
-      href: "https://x.com/emremiracckr",
-      icon: Twitter,
-      external: true
     }
   ];
 
@@ -449,9 +562,27 @@ function CommandPalette({
 }
 
 function Navbar() {
+  const activeSection = useActiveSection(trackedSectionIds);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 24);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-ink/70 backdrop-blur-xl">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
+    <motion.header
+      className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300 ${
+        scrolled
+          ? "border-cyan-300/15 bg-ink/78 shadow-[0_12px_44px_rgba(0,0,0,0.28)] backdrop-blur-2xl"
+          : "border-white/10 bg-ink/58 backdrop-blur-xl"
+      }`}
+      animate={{ height: scrolled ? 58 : 64 }}
+      transition={{ duration: 0.24, ease: "easeOut" }}
+    >
+      <nav className="mx-auto flex h-full max-w-7xl items-center justify-between px-5 sm:px-8">
         <a
           href="#top"
           className="group flex h-11 min-w-16 cursor-pointer items-center justify-center transition duration-300 hover:scale-105"
@@ -464,21 +595,38 @@ function Navbar() {
             <a
               key={item.href}
               href={item.href}
-              className="transition hover:text-cyan-200"
+              className={`group relative py-2 transition duration-300 hover:text-cyan-200 ${
+                activeSection === item.href.slice(1) ? "text-cyan-100" : ""
+              }`}
             >
               {item.label}
+              <span
+                className={`absolute inset-x-0 -bottom-0.5 h-px rounded-full bg-gradient-to-r from-cyan-300 to-blue-500 transition duration-300 ${
+                  activeSection === item.href.slice(1)
+                    ? "opacity-100 shadow-[0_0_14px_rgba(33,212,253,0.55)]"
+                    : "opacity-0 group-hover:opacity-50"
+                }`}
+              />
             </a>
           ))}
         </div>
-        <a
-          href="#contact"
-          className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-200/70 hover:bg-cyan-300/10"
-        >
-          Contact
-          <ArrowRight className="h-4 w-4" />
-        </a>
+        <div className="flex items-center gap-3">
+          <span className="hidden rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-xs text-slate-500 lg:inline-flex">
+            Press ⌘K
+          </span>
+          <motion.a
+            href="#contact"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 420, damping: 26 }}
+            className="group inline-flex items-center gap-2 rounded-full border border-cyan-300/30 px-4 py-2 text-sm font-medium text-cyan-100 transition duration-300 hover:border-cyan-200/70 hover:bg-cyan-300/10 hover:shadow-[0_0_26px_rgba(33,212,253,0.16)]"
+          >
+            Contact
+            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-[3px]" />
+          </motion.a>
+        </div>
       </nav>
-    </header>
+    </motion.header>
   );
 }
 
@@ -582,7 +730,7 @@ function Hero() {
             <Sparkles className="h-4 w-4" />
             Software Developer · Technology Columnist · Builder
           </motion.div>
-          <h1 className="text-balance text-5xl font-semibold leading-[0.98] text-white sm:text-7xl lg:text-8xl">
+          <h1 className="font-heading text-balance text-5xl font-semibold leading-[0.98] tracking-[-0.02em] text-white sm:text-7xl lg:text-8xl">
             <motion.span
               custom={0.2}
               variants={heroTitle}
@@ -602,8 +750,8 @@ function Hero() {
             variants={heroSubtitle}
             className="mt-7 max-w-2xl text-balance text-xl leading-8 text-slate-300 sm:text-2xl sm:leading-9"
           >
-            I build software systems and write about technology, engineering,
-            and the future.
+            I build <GradientText>software systems</GradientText> and write about{" "}
+            <GradientText>technology</GradientText>, engineering, and the future.
           </motion.p>
           <motion.div
             variants={heroButtons}
@@ -712,9 +860,9 @@ function About() {
             <GlassPanel>
               <p className="text-lg leading-8 text-slate-300">
                 His work combines an engineering mindset with storytelling and
-                business awareness: building useful systems, explaining complex
-                ideas clearly, and thinking about how technology becomes a product,
-                a platform, or a company advantage.
+                business awareness: building <GradientText>useful systems</GradientText>,
+                explaining complex ideas clearly, and thinking about how technology
+                becomes a product, a platform, or a company advantage.
               </p>
             </GlassPanel>
           </motion.div>
@@ -814,7 +962,7 @@ function TiltProjectCard({ project }: { project: Project }) {
       className="group"
     >
       <GlassPanel className="flex h-full flex-col group-hover:border-cyan-300/40 group-hover:shadow-[0_24px_80px_rgba(33,212,253,0.14)]">
-        <h3 className="text-xl font-semibold text-white">{project.title}</h3>
+        <h3 className="font-heading text-xl font-semibold tracking-[-0.01em] text-white">{project.title}</h3>
         <p className="mt-4 flex-1 leading-7 text-slate-300">
           {project.description}
         </p>
@@ -863,10 +1011,16 @@ function Writing() {
               <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-cyan-100">
                 {article.category}
               </span>
-              <span className="text-slate-500">{article.date}</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1 text-xs text-slate-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(33,212,253,0.65)]" />
+                Currently writing
+              </span>
             </div>
-            <h3 className="text-2xl font-semibold text-white">{article.title}</h3>
+            <h3 className="font-heading text-2xl font-semibold tracking-[-0.01em] text-white">{article.title}</h3>
             <p className="mt-4 leading-7 text-slate-300">{article.summary}</p>
+            <p className="mt-4 text-sm text-slate-500">
+              In progress · {article.date}
+            </p>
             <a
               href="#"
               className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-100"
@@ -905,7 +1059,7 @@ function Highlights() {
           >
             <GlassPanel className="h-full group-hover:border-cyan-300/35 group-hover:shadow-[0_22px_70px_rgba(33,212,253,0.12)]">
               <item.icon className="h-7 w-7 text-cyan-200" />
-              <h3 className="mt-5 text-lg font-semibold text-white">{item.title}</h3>
+              <h3 className="mt-5 font-heading text-lg font-semibold tracking-[-0.01em] text-white">{item.title}</h3>
               <p className="mt-3 text-sm leading-6 text-slate-400">{item.text}</p>
             </GlassPanel>
           </motion.div>
@@ -1002,6 +1156,71 @@ function Contact() {
   );
 }
 
+function Footer({ year }: { year: number }) {
+  return (
+    <footer className="relative px-5 py-12 sm:px-8">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/45 to-transparent" />
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row md:items-center md:justify-between">
+        <div className="max-w-md">
+          <a
+            href="#top"
+            aria-label="Back to top"
+            className="group inline-flex items-center"
+          >
+            <Logo />
+          </a>
+          <p className="mt-4 text-sm leading-6 text-slate-400">
+            Building software systems and writing about the future of technology.
+          </p>
+          <p className="mt-3 text-xs text-slate-600">
+            Built with Next.js &amp; Framer Motion · {year}
+          </p>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="mt-5 inline-flex rounded-full border border-cyan-300/10 bg-cyan-300/[0.04] px-3 py-1.5 font-mono text-[11px] text-slate-500"
+          >
+            <span className="text-cyan-200/80">emc.signal</span>
+            <span className="px-1 text-slate-700">=</span>
+            <span>{`"build · write · ship"`}</span>
+          </motion.div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {socialLinks.map((item) => (
+            <motion.a
+              key={item.label}
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={item.label}
+              whileHover={{ scale: 1.06, y: -2 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 420, damping: 25 }}
+              className="grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-slate-400 transition duration-300 hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-cyan-100 hover:shadow-[0_0_28px_rgba(33,212,253,0.16)]"
+            >
+              <item.icon className="h-5 w-5" />
+            </motion.a>
+          ))}
+          <span className="ml-0 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-xs text-slate-500 md:ml-2">
+            Press ⌘K
+          </span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function GradientText({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="bg-gradient-to-r from-cyan-200 to-blue-400 bg-clip-text font-medium text-transparent">
+      {children}
+    </span>
+  );
+}
+
 function Section({
   id,
   eyebrow,
@@ -1014,7 +1233,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="relative px-5 py-20 sm:px-8 sm:py-24">
+    <section id={id} className="relative scroll-mt-20 px-5 py-20 sm:px-8 sm:py-24">
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/12 to-transparent sm:inset-x-8" />
       <div className="mx-auto max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 18 }}
@@ -1026,7 +1246,7 @@ function Section({
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">
             {eyebrow}
           </p>
-          <h2 className="text-balance text-3xl font-semibold leading-tight text-white sm:text-5xl">
+          <h2 className="font-heading text-balance text-3xl font-semibold leading-tight tracking-[-0.015em] text-white sm:text-5xl">
             {title}
           </h2>
         </motion.div>
@@ -1045,7 +1265,7 @@ function GlassPanel({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-card backdrop-blur transition duration-300 hover:border-cyan-300/25 ${className}`}
+      className={`rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-card backdrop-blur transition duration-300 ease-out hover:-translate-y-1.5 hover:border-cyan-300/35 hover:shadow-[0_24px_80px_rgba(33,212,253,0.12)] ${className}`}
     >
       {children}
     </div>
@@ -1059,14 +1279,40 @@ function PrimaryButton({
   href: string;
   children: React.ReactNode;
 }) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const smoothX = useSpring(x, { stiffness: 220, damping: 18 });
+  const smoothY = useSpring(y, { stiffness: 220, damping: 18 });
+
+  const handleMouseMove = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    x.set(((event.clientX - rect.left) / rect.width - 0.5) * 8);
+    y.set(((event.clientY - rect.top) / rect.height - 0.5) * 6);
+  };
+
+  const resetMagnet = () => {
+    x.set(0);
+    y.set(0);
+  };
+
   return (
-    <a
+    <motion.a
       href={href}
-      className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-cyan-300 px-6 text-sm font-semibold text-slate-950 shadow-glow transition duration-300 hover:bg-white"
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={resetMagnet}
+      style={{ x: smoothX, y: smoothY }}
+      transition={{ type: "spring", stiffness: 420, damping: 26 }}
+      className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-cyan-300 px-6 text-sm font-semibold text-slate-950 shadow-glow transition duration-300 ease-out hover:bg-white hover:shadow-[0_0_34px_rgba(33,212,253,0.22)]"
     >
       {children}
-      <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-    </a>
+      <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-[3px]" />
+    </motion.a>
   );
 }
 
@@ -1078,13 +1324,16 @@ function SecondaryButton({
   children: React.ReactNode;
 }) {
   return (
-    <a
+    <motion.a
       href={href}
-      className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-6 text-sm font-semibold text-white transition duration-300 hover:border-cyan-300/40 hover:bg-cyan-300/10"
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 420, damping: 26 }}
+      className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-6 text-sm font-semibold text-white transition duration-300 ease-out hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:shadow-[0_0_30px_rgba(33,212,253,0.14)]"
     >
       {children}
-      <ArrowRight className="h-4 w-4 text-cyan-100/70 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-cyan-100" />
-    </a>
+      <ArrowRight className="h-4 w-4 text-cyan-100/70 transition-transform duration-300 group-hover:translate-x-[3px] group-hover:text-cyan-100" />
+    </motion.a>
   );
 }
 
@@ -1096,13 +1345,16 @@ function SmallButton({
   children: React.ReactNode;
 }) {
   return (
-    <a
+    <motion.a
       href={href}
-      className="group inline-flex h-10 items-center gap-2 rounded-full border border-white/10 px-4 text-sm font-medium text-slate-200 transition duration-300 hover:border-cyan-300/40 hover:text-cyan-100"
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 420, damping: 26 }}
+      className="group inline-flex h-10 items-center gap-2 rounded-full border border-white/10 px-4 text-sm font-medium text-slate-200 transition duration-300 ease-out hover:border-cyan-300/40 hover:text-cyan-100 hover:shadow-[0_0_24px_rgba(33,212,253,0.12)]"
     >
       {children}
-      <ArrowRight className="h-3.5 w-3.5 text-slate-500 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-cyan-100" />
-    </a>
+      <ArrowRight className="h-3.5 w-3.5 text-slate-500 transition-transform duration-300 group-hover:translate-x-[3px] group-hover:text-cyan-100" />
+    </motion.a>
   );
 }
 
